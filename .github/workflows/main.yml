@@ -1,0 +1,53 @@
+Auf:
+  Freigabe:
+    Typen: [veröffentlicht] # Only triggered when a version is published
+  Zeitplan:
+- cron: "0 0 * * *" # Nachtaufbau
+Jobs:
+  Betenarbeiter:
+    läuft an: ubuntu-latest
+    Schritte:
+- Name: Checkout-Code
+        Verwendet: Aktionen/Kasse@v3
+        Mit:
+          Tiefe der Abfrings: 0
+          
+- Name: QEMU einrichten
+        Verwendet: Docker/setup-qemu-action@v2
+        
+- Name: Docker Buildx einrichten
+        Verwendet: docker/setup-buildx-action@v2
+        
+- Name: Sign in Docker Hub
+        Verwendet: Docker/Login-Action@v2
+        Mit:
+          Benutzername: ${{ secrets.DOCKER_USERNAME }}
+          Passwort: ${{ secrets.DOCKER_PASSWORD }}
+          
+- Name: Anmeldung bei GitHub Container Registry
+        Verwendet: Docker/Login-Action@v2
+        Mit:
+          Registrierung: ghcr.io
+          Benutzername: ${{ github.repository_owner }}
+          Passwort: ${{ secrets.GHCR_PAT }}
+          
+- Name: Metadaten extrahieren
+        Identifikation: Meta
+        Verwendet: Docker/Metadata-Action@v4
+        Mit:
+          Bilder: |
+${{ secrets.DOCKER_USERNAME }}/paperless-ai
+ghcr.io/${{ github.repository_owner }}/paperless-ai
+          Tags: |
+Typ=Zeitplan,Muster=Nacht
+type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
+type=raw,value=latest,enable=${{ github.event_name == 'release' }}
+            
+- Name: Bauen und Pushen
+        Verwendet: Docker/build-push-action@v4
+        Mit:
+          Kontext: .
+          Drücken: wahr
+          Plattformen: Linux/amd64, Linux/Arm64
+          Tags: ${{ steps.meta.outputs.tags }}
+          Etiketten: ${{ steps.meta.outputs.labels }}
